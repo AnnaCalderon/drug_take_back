@@ -1,0 +1,287 @@
+---
+title: "Take Back Drug Drop Boxes"
+author: "Anna Calderon"
+date: "2023-06-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(tidygeocoder)
+library(sf)
+library(mapview)
+library(janitor)
+library(tm)
+```
+
+```{r dea-data}
+dea_data <- read_csv(file = "data/dea_data_raw.csv") |> 
+  clean_names() |> 
+  distinct(bus_name, addr_1, addr_2, city_state_zip) |> # remove duplicates
+  filter(str_detect(city_state_zip, "NY")) # include NY only
+
+# check data with no address 2 --- good 
+dea_data1 <- dea_data |> 
+  filter(is.na(addr_2)) 
+
+# check data with address 1 --- fixed 
+dea_data2 <- dea_data |> 
+  filter(!(is.na(addr_2))) |> 
+  # address number and street is sometimes in address 2 
+  # in those cases we make addr2 addr1 
+  #filter(str_starts(addr_2, "[0-9]+")) |> 
+  mutate(addr_1 = ifelse(str_starts(addr_1, "[0-9]+"), addr_1, addr_2)) 
+
+# join data1 and data2 
+dea_data_joined <- rbind(dea_data1,dea_data2)
+
+dea_data_joined <- dea_data_joined |> 
+  select(bus_name, addr_1, city_state_zip)
+
+
+
+```
+
+```{r}
+# these don't have a standars address structure 
+potential_wrong_address <- dea_data_joined |> 
+  # filter addresses that do not start with a number 
+  filter(!(str_starts(addr_1, "[0-9]+"))) |> 
+  mutate(address_original = paste0(addr_1, ", ", city_state_zip)) |> 
+  mutate(zip_original = substr(city_state_zip, nchar(city_state_zip) - 5 + 1, 
+                               nchar(city_state_zip))) |> 
+  select(bus_name, address_original, zip_original) |> 
+  tidygeocoder::geocode(
+    address = address_original,
+    #method = "osm"
+    method ="arcgis" 
+  ) |> 
+  tidygeocoder::reverse_geocode(
+    lat = lat,
+    long = long,
+    method = "osm"
+  ) |> 
+  mutate(address2 = address) |> 
+  mutate(address2 = removeWords(address2,", United States")) |> 
+  mutate(zipcode = substr(address2, nchar(address2) - 5 + 1, 
+                               nchar(address2))) |> 
+  mutate(error = ifelse(zip_original != zipcode, 1, 0)) 
+
+good_data <- dea_data_joined |> 
+  filter(str_starts(addr_1, "[0-9]+"))
+
+
+potential_wrong_address 
+```
+
+```{r}
+# for these we need to manually locate the county using the zip-code 
+wrong_address <- potential_wrong_address |> 
+  filter(error == 1) |> 
+  select(bus_name, address_original) |> 
+  tidygeocoder::geocode(
+    address = address_original,
+    #method = "osm"
+    method ="arcgis" 
+  ) |> 
+  tidygeocoder::reverse_geocode(
+    lat = lat,
+    long = long,
+    method = "osm"
+  )
+
+# regardless of the wrong address arcgis found the correct location 
+# these can be added to the joined data 
+wrong_address_ok <- potential_wrong_address |> 
+  filter(error == 0) |> 
+  select(bus_name, address_original)
+
+
+```
+
+
+
+```{r}
+
+
+good_data_clean <- good_data  |> 
+  select(bus_name, addr_1, city_state_zip) |> 
+  separate(addr_1,c("num","addr_1"), sep="^\\S*\\K\\s+") |> 
+  separate(city_state_zip,c("city","state_zip"), sep=",\\s*") |> 
+  separate(state_zip, c("state","zip_original"), sep=" \\s*") |> 
+  mutate(address_original = paste0(num, ", ", addr_1, ", ", city, ", ", 
+                          state, ", ", zip_original)) |> 
+  select(bus_name, address_original)
+
+# all addresses with right location -- missing the wrong addresses 
+# the ones that will be located using zip-code 
+all_good_data <- rbind(good_data_clean, wrong_address_ok)
+
+geocoded_data <- all_good_data |> 
+  slice(1:5) |> 
+  # getting lat and long 
+  tidygeocoder::geocode(
+    address = address_original,
+    #method = "osm"
+    method ="arcgis" 
+  ) |> 
+# reverse geocode will get the county name
+  tidygeocoder::reverse_geocode(
+    lat = lat,
+    long = long,
+    method = "arcgis"
+  ) 
+
+# 6/30 2:39pm 
+# write_rds(geocoded_data, "data/geocoded_data")
+# HELP -- should I count these as 1? 
+# for now I am counting them as 1
+# geocoded_data |> distinct(lat, long) #856
+# geocoded_data |> 
+#   group_by(lat, long) |> 
+#   mutate(locations = n()) |> 
+#   ungroup() |> 
+#   filter(locations == 2) 
+
+# keeping the distinct values for lat and long 
+geocoded_data <- readRDS("data/geocoded_data") |> 
+  distinct(lat, long, .keep_all = TRUE)
+geocoded_data
+```
+
+
+```{r}
+
+all_counties_dea <- geocoded_data  |> 
+  #remove everything before the word county
+  mutate(county = gsub('\\s*County.*$', '', address)) |> 
+  #remove everything before the last coma
+  mutate(county = sub(",([^,]*)$", " --\\1", county) ) |> 
+  mutate(county = gsub('^.*--\\s*', '', county)) |> 
+  mutate(zip_original = substr(address_original, nchar(address_original) - 5 + 1, 
+                               nchar(address_original))) |> 
+  mutate(zip_code = removeWords(address,", United States")) |> 
+  mutate(zip_code = substr(zip_code, nchar(zip_code) - 5 + 1, 
+                               nchar(zip_code)))
+  
+  # mutate(county_locations = n()) |> 
+  # ungroup()
+
+#checking there are no duplicates -- none
+# all_counties |> 
+#   group_by(lat, long) |> 
+#   mutate(num_locations = n()) |> View()
+
+# checking original address zipcode and reverse geocoded address match
+# HELP -- can be due to mail addres vs geographical area
+# all_counties |> 
+#   mutate(error = ifelse(zip_original != zip_code, 1, 0)) |> 
+#   filter(error == 1) |> View()
+
+
+# write_rds(all_counties_dea, "data/dea_clean_data.rds")
+```
+
+```{r}
+communities_13 <- all_counties_dea |> 
+  filter(county == "Broome" |
+           county == "Cayuga" |
+           county == "Chautauqua"|
+           county == "Columbia" |
+           county == "Cortland"|
+           county == "Genesee" |
+           county == "Greene"|
+           county == "Lewis" |
+           county == "Orange"|
+           county == "Putnam" |
+           county == "Sullivan"|
+           county == "Ulster" |
+           county == "Yates") |> 
+  rename(Community = county)
+  # group_by(county) |> 
+  # count() |> 
+  # rename(Community = county,
+  #        Locations = n)
+
+
+# we need to get the cities for these 
+communities_3 <- all_counties_dea |> 
+  #filter(county == "Suffolk")
+  filter(county == "Erie" | 
+           county == "Monroe" |
+           county == "Suffolk") |> 
+  filter(str_detect(address_original, "BUFFALO, NY,")|
+           str_detect(address_original, "ROCHESTER, NY,")|
+           str_detect(address_original, "BROOKHAVEN, NY,")) |> 
+  mutate(Community = case_when(
+    str_detect(address_original, "BUFFALO, NY,") ~ "Buffalo",
+    str_detect(address_original, "ROCHESTER, NY,") ~ "Rochester",
+    str_detect(address_original, "Brookhaven, NY,") ~ "Brookhaven"
+  )) |> 
+  select(bus_name, address_original, lat, long, address, Community, zip_original,
+         zip_code)
+  # group_by(Community) |> 
+  # count() |> 
+  # rename(Locations = n)
+
+communities_16 <- rbind(communities_13,communities_3)
+
+# this is what we have for now 
+communities_16 |> 
+  group_by(Community) |> 
+  count() |> 
+  rename(Locations = n)
+
+```
+
+```{r}
+# library(doParallel)
+# doParallel::registerDoParallel()
+
+
+nydoh_data <- read_rds("ny_takeback.rds") |> 
+  #mutate(source = rep("nydoh")) |> 
+  mutate(address_original = paste0(address, ", ", city, ", ", zip_code)) |> 
+  select(address_original) |> 
+  #slice(1:5) |> 
+  #mutate(address_original = tolower(address_original))
+  tidygeocoder::geocode(
+    address = address_original,
+    #method = "osm"
+    method ="arcgis" 
+  )
+
+write_rds(nydoh_data, "geocoded_nydoh_data.rds")
+
+  # tidygeocoder::reverse_geocode(
+  #   lat = lat,
+  #   long = long,
+  #   method = "osm"
+  # )
+```
+
+```{r}
+nydoh_data2 <- nydoh_data |> 
+  mutate(zip_original = substr(address_original, nchar(address_original) - 5 + 1, 
+                               nchar(address_original))) |> 
+  mutate(address2 = address) |> 
+  mutate(address2 = removeWords(address2,", United States")) |> 
+  mutate(zip_code = substr(address2, nchar(address2) - 5 + 1, 
+                               nchar(address2))) |> 
+  select(-address2) |> 
+  mutate(error = ifelse(zip_original != zip_code, 1, 0)) 
+
+error_data2 <- nydoh_data2 |> 
+  filter(error == 1)
+
+good_data2 <- nydoh_data2 |> 
+  filter(error == 0)
+  
+```
+
+
