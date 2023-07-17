@@ -105,18 +105,16 @@ wrong_address_ok <- potential_wrong_address |>
 
 
 ```{r}
-good_data_clean <- good_data  |> 
+all_good_data <- good_data  |> 
   select(bus_name, addr_1, city_state_zip) |> 
   separate(addr_1, c("num","addr_1"), sep="^\\S*\\K\\s+") |> 
   separate(city_state_zip,c("city","state_zip"), sep=",\\s*") |> 
   separate(state_zip, c("state","zip_original"), sep=" \\s*") |> 
   mutate(address_original = paste0(num, ", ", addr_1, ", ", city, ", ", 
                           state, ", ", zip_original)) |> 
-  select(bus_name, address_original)
-
-# all addresses with right location -- missing the wrong addresses 
-# the ones that will be located using zip-code 
-all_good_data <- rbind(good_data_clean, wrong_address_ok)
+  select(bus_name, address_original) |> 
+  # joing the potential wrong addresses 
+  rbind(wrong_address_ok)
 
 geocoded_data <- all_good_data |> 
   slice(1:5) |> 
@@ -137,12 +135,12 @@ geocoded_data <- all_good_data |>
 # write_rds(geocoded_data, "data/geocoded_data")
 # HELP -- should I count these as 1? 
 # for now I am counting them as 1
-# geocoded_data |> distinct(lat, long) #856
-# geocoded_data |> 
-#   group_by(lat, long) |> 
-#   mutate(locations = n()) |> 
-#   ungroup() |> 
-#   filter(locations == 2) 
+geocoded_data |> distinct(lat, long) #856
+geocoded_data |>
+  group_by(lat, long) |>
+  mutate(locations = n()) |>
+  ungroup() |>
+  filter(locations == 2)
 
 # keeping the distinct values for lat and long 
 geocoded_data <- readRDS("data/geocoded_data") |> 
