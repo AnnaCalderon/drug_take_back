@@ -1,127 +1,16 @@
 ---
-title: "Webscraping Drug Takeback"
-# subtitle: ""
-# author: Kyle Grealis
-description: "in New York"
-format: 
-  html:
-    page-layout: full
-    grid: 
-      margin-width: 0px
-    toc: true
-    toc-title: ""
-    toc-location: left
-    self-contained: true
-    css: styles.css
-    theme: sandstone
-    code-tools: true
-    code-copy: true
-execute: 
-  echo: false
-  warning: false
-  cache: true
-# server: shiny
---- 
+title: "additional code"
+format: html
+editor: visual
+---
 
-```{r}
-#| label: setup
-library(conflicted)
-conflict_prefer('filter', 'dplyr')
-library(janitor)
-library(polite)
-library(rvest)
-library(stringr)
-library(tidyverse)
-library(tidycensus)
-library(tidygeocoder)
-library(sf)
-library(mapview)
-library(xml2)
-```
+## Quarto
 
-# Data importing and cleaning
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
 
+## Running Code
 
-```{r}
-# set-up for web scraping:
-# base_url <- 
-#   'https://medtakebacknewyork.org/?cpage=%s&zipcode=10128'
-
-# counter:
-# i <- 1
-
-# table that will be created:
-# new_york_raw <- tibble()
-```
-
-
-```{r}
-
-# create a while loop that iterates through all of the pages on the main website:
-# while (i <= 113) {
-# 
-#   new_page <-
-#     read_html(
-#       # change the page number with each iteration of the loop
-#       sprintf(
-#         base_url,
-#         i
-#       )
-#     )
-# 
-#   new_table <-
-#     tibble(
-# 
-#       # This will extract particular elements from the webpage. Using regex,
-#       # it will then obtain certain elements for each site: name, location, etc.
-#       facility =
-#         new_page|>
-#         html_elements('.company') |>
-#         html_element('b') |>
-#         html_text2(),
-# 
-#       zip_code =
-#         new_page|>
-#         html_elements('.address') |>
-#         html_text2() |>
-#         str_remove(pattern = '\\nGet Directions') |>
-#         str_sub(start = -5),
-# 
-#       city =
-#         new_page|>
-#         html_elements('.address') |>
-#         html_text2() |>
-#         str_extract('(?<=\\n)(.*?)(?=,)') |>
-#         str_to_title(),
-# 
-#       street =
-#         new_page|>
-#         html_elements('.address') |>
-#         html_text2() |>
-#         str_extract(pattern = '(.*?)\\n') |>
-#         str_remove(pattern = '\\n') |>
-#         str_to_title()
-# 
-#     )
-# 
-#   # append each iteration of the data to the main table:
-#   new_york_raw <-
-#     rbind(
-#       new_york_raw,
-#       new_table
-#     )
-# 
-#   # increase counter
-#   i <- i + 1
-# 
-# }
-```
-
-```{r}
-# save/import data
-# rio::export(new_york_raw, 'data/ny_takeback_raw.rda')
-doh_data_raw <- rio::import('data/ny_takeback_raw.rda')
-```
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
 
 ```{r}
 doh <- 
@@ -182,13 +71,11 @@ doh <-
 head(doh)
 ```
 
-
 ```{r}
 # import raw csv of DEA data
 dea_data_raw <-
   rio::import('data/dea_data_raw.csv')
 ```
-
 
 ```{r}
 dea_first_clean <-
@@ -322,8 +209,6 @@ new_york <-
   )
 ```
 
-
-
 # Use `tidygeocoder` to find county
 
 ```{r}
@@ -356,7 +241,6 @@ new_york <-
 # stop_time - start_time
 ```
 
-
 ```{r}
 # rio::export(ny_geocode, 'data/ny_geocode.RData')
 ny_geocode <- 
@@ -367,7 +251,6 @@ ny_geocode <-
 
 head(ny_geocode)
 ```
-
 
 ```{r}
 # determine which locations were able to obtain county info from geocoder
@@ -448,9 +331,6 @@ county_info |>          ### DELETE this line once the line above has been done!!
 #   View()
 ```
 
-
-
 ```{r}
 # end
 ```
-
