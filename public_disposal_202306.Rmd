@@ -133,15 +133,7 @@ geocoded_data <- geocoded_data |>
     method = "osm"
   ) 
 
-# write_rds(geocoded_data, "data/geocoded_data.rds")
-# HELP -- should I count these as 1? 
-# for now I am counting them as 1
-geocoded_data |> distinct(lat, long) #856
-geocoded_data |>
-  group_by(lat, long) |>
-  mutate(locations = n()) |>
-  ungroup() |>
-  filter(locations == 2)
+# write_rds(geocoded_data, "data/geocoded_dea_data.rds")
 
 # keeping the distinct values for lat and long 
 geocoded_data <- readRDS("data/geocoded_data.rds") |> 
@@ -161,8 +153,8 @@ all_counties_dea <- geocoded_data  |>
   
 
 #checking there are no duplicates -- none
-# all_counties |> 
-#   group_by(lat, long) |> 
+# all_counties_dea |>
+#   group_by(lat, long) |>
 #   mutate(num_locations = n()) |> View()
 
 # write_rds(all_counties_dea, "data/dea_clean_data.rds")
@@ -184,10 +176,6 @@ communities_13 <- all_counties_dea |>
            county == "Ulster" |
            county == "Yates") |> 
   rename(Community = county)
-  # group_by(county) |> 
-  # count() |> 
-  # rename(Community = county,
-  #        Locations = n)
 
 
 # we need to get the cities for these 
@@ -205,14 +193,10 @@ communities_3 <- all_counties_dea |>
     str_detect(address_original, "Brookhaven, NY,") ~ "Brookhaven"
   )) |> 
   select(bus_name, address_original, lat, long, address, Community, zip_original,
-         zip_code)
-  # group_by(Community) |> 
-  # count() |> 
-  # rename(Locations = n)
+         zip_code) |> 
+  rbind(communities_13)
 
-communities_16 <- rbind(communities_13,communities_3)
-
-# this is what we have for now 
+# this is what we have for dea
 communities_16 |> 
   group_by(Community) |> 
   count() |> 

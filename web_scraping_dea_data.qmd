@@ -120,7 +120,9 @@ library(xml2)
 ```{r}
 # save/import data
 # rio::export(new_york_raw, 'raw_data/ny_takeback_raw.rda')
-doh_data_raw <- rio::import('raw_data/ny_takeback_raw.rda')
+# doh_data_raw <- rio::import('data/ny_takeback_raw.rda')
+
+write_rds(doh_data_raw, "raw_data/doh_data_raw.rds")
 ```
 
 
