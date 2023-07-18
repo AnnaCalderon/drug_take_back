@@ -136,7 +136,7 @@ geocoded_data <- geocoded_data |>
 # write_rds(geocoded_data, "data/geocoded_dea_data.rds")
 
 # keeping the distinct values for lat and long 
-geocoded_data <- readRDS("data/geocoded_data.rds") |> 
+geocoded_data <- readRDS("data/geocoded_dea_data.rds") |> 
   distinct(lat, long, .keep_all = TRUE)
 geocoded_data
 ```
@@ -179,7 +179,7 @@ communities_13 <- all_counties_dea |>
 
 
 # we need to get the cities for these 
-communities_3 <- all_counties_dea |> 
+communities_16 <- all_counties_dea |> 
   #filter(county == "Suffolk")
   filter(county == "Erie" | 
            county == "Monroe" |
@@ -192,8 +192,7 @@ communities_3 <- all_counties_dea |>
     str_detect(address_original, "ROCHESTER, NY,") ~ "Rochester",
     str_detect(address_original, "Brookhaven, NY,") ~ "Brookhaven"
   )) |> 
-  select(bus_name, address_original, lat, long, address, Community, zip_original,
-         zip_code) |> 
+  select(bus_name, address_original, lat, long, address, Community) |> 
   rbind(communities_13)
 
 # this is what we have for dea
@@ -202,18 +201,14 @@ communities_16 |>
   count() |> 
   rename(Locations = n)
 
-#write_rds(communities_16, "data/clean_dea_data.rds")
 
 ```
 
 ```{r}
-# library(doParallel)
-# doParallel::registerDoParallel()
 
-
-nydoh_data <- read_rds("ny_takeback.rds") |> 
+nydoh_data <- read_rds("raw_data/doh_data_raw.rds") |> 
   #mutate(source = rep("nydoh")) |> 
-  mutate(address_original = paste0(address, ", ", city, ", ", zip_code)) |> 
+  mutate(address_original = paste0(street, ", ", city, ", ", zip_code)) |> 
   select(address_original) |> 
   #slice(1:5) |> 
   #mutate(address_original = tolower(address_original))
@@ -223,25 +218,22 @@ nydoh_data <- read_rds("ny_takeback.rds") |>
     method ="arcgis" 
   )
 
-# write_rds(nydoh_data, "geocoded_nydoh_data.rds")
 
-# geocoded_nydoh_data <- readRDS("geocoded_nydoh_data.rds")
-# 
-# geocoded_nydoh_data2 <- geocoded_nydoh_data |> 
-#   tidygeocoder::reverse_geocode(
-#     lat = lat,
-#     long = long,
-#     method = "osm"
-#   )
+geocoded_nydoh_data <- nydoh_data |>
+  tidygeocoder::reverse_geocode(
+    lat = lat,
+    long = long,
+    method = "osm"
+  )
 
 
-#write_rds(geocoded_nydoh_data2, "geocoded_nydoh_data2.rds")
-geocoded_nydoh_data2 <- readRDS("geocoded_nydoh_data2.rds")
+#write_rds(geocoded_nydoh_data, "data/geocoded_nydoh_data.rds")
+geocoded_nydoh_data <- readRDS("data/geocoded_nydoh_data.rds")
 ```
 
 ```{r}
 
-clean_nydoh_data <- geocoded_nydoh_data2 |> 
+clean_nydoh_data <- geocoded_nydoh_data |> 
   distinct(lat, long, .keep_all = TRUE) |> 
   # WE EXTRACT THE COUNTIES from address (reverse geocoded)
   #remove everything before the word county
@@ -277,16 +269,15 @@ clean_nydoh_data <- geocoded_nydoh_data2 |>
            Community != "Monroe" |
            Community != "Sufflok") |> 
   select(address_original, lat, long, address, Community) 
-  
-clean_dea_data <- readRDS("data/clean_dea_data.rds")
 
-clean_joined_data <- clean_dea_data |> 
+
+clean_dea_data |> 
   select(address_original, lat, long, address, Community) |> 
   rbind(clean_nydoh_data) |> 
   distinct(lat, long, .keep_all = TRUE) 
 clean_joined_data |> 
   group_by(Community) |> 
-  count()
+  count() 
 ```
 
 
